@@ -8,5 +8,7 @@ output/
 input/
 *.xml
 *.vcf
+!tests/fixtures/*.xml
+!tests/fixtures/*.vcf
 *.sqlite
 *.db

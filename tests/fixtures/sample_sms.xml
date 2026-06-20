@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<smses count="6">
+  <sms protocol="0" address="2025550101" date="1700000000000" type="1" body="Can you do the equipment install at 100 Example St?" readable_date="Nov 14, 2023 10:13:20 PM" contact_name="Sample Contact One" />
+  <sms protocol="0" address="2025550101" date="1700003600000" type="2" body="Yes estimate is $850 and I can come Friday." readable_date="Nov 14, 2023 11:13:20 PM" contact_name="Sample Contact One" />
+  <sms protocol="0" address="2025550202" date="1700100000000" type="1" body="Just sent the payment for $500 thanks" readable_date="Nov 16, 2023 1:20:00 AM" contact_name="Sample Contact Two" />
+  <sms protocol="0" address="2025550202" date="1700103600000" type="2" body="Got it thanks, paid in full." readable_date="Nov 16, 2023 2:20:00 AM" contact_name="Sample Contact Two" />
+  <sms protocol="0" address="2025550199" date="1700200000000" type="1" body="Your verification code is 123456" readable_date="Nov 17, 2023 4:06:40 AM" contact_name="(Unknown)" />
+  <mms date="1700300000000" msg_box="1" address="2025550101" contact_name="Sample Contact One"><parts><part seq="0" ct="text/plain" text="Photo of equipment attached" /></parts><addrs><addr address="2025550101" type="137" charset="106" /></addrs></mms>
+</smses>
