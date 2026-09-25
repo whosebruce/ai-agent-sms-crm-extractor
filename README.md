@@ -1,46 +1,21 @@
 # AI Agent SMS CRM Extractor
 
-Local-first **contacts + Android SMS Backup & Restore XML** to lightweight CRM extractor for small service businesses and AI-agent workflows.
+A local command-line tool that turns a phone's contacts export and an Android SMS backup into a small CRM: contacts, job leads, payment clues and a review queue.
 
-The tool is designed for scenarios where a business owner already has useful customer records saved in their phone contacts: names, numbers, and sometimes addresses. It uses that contact export as the seed customer database, then enriches those contacts from SMS/MMS history.
+It's for small service businesses whose customer history lives in a phone. Saved contacts become the seed customer list, and SMS/MMS threads add job, address and payment evidence to each one. It is written so an AI agent can run it on the owner's computer without the messages leaving that machine. Version 0.1.0, first published June 2026.
 
-## What it does
+## How it keeps data local
 
-1. Imports contacts from a `.vcf` export.
-2. Uses saved contact phone numbers and addresses as the seed CRM.
-3. Parses Android `SMS Backup & Restore` XML.
-4. Matches message threads back to known contacts by phone number.
-5. Finds conservative customer/job/payment/address clues.
-6. Outputs local files only: CSV, SQLite, HTML dashboard, and JSON audit.
+- Pure Python standard library with no third-party dependencies.
+- No network code and no LLM calls. Extraction is keyword and pattern matching.
+- `extract` asks for confirmation before it reads anything. `--yes` skips the prompt for scripted runs.
+- `dashboard.html` is a single static file with no external scripts, fonts or images.
 
-No cloud upload. No external API calls. No LLM calls by default.
+The outputs themselves are sensitive. See [Privacy](#privacy) below.
 
-## AI agent safe-use promise
+## Install
 
-This repository is meant to be easy for an AI agent to run on a user's own computer without leaking private messages.
-
-Agents should follow these rules:
-
-- Run locally only.
-- Do not upload `.vcf`, `.xml`, CSV, SQLite, HTML, or message contents.
-- Do not paste private message contents into chat.
-- Do not use remote workbenches, online converters, telemetry, or external APIs.
-- Report counts and file paths by default, not private customer text.
-- Treat payment status as an inferred review queue, not accounting truth.
-
-See [`AGENT_README.md`](AGENT_README.md) for a copy/paste agent prompt.
-
-## Why contacts first?
-
-Contacts-first extraction is usually cleaner than scraping all messages and guessing who matters:
-
-- Contacts become the seed customer database.
-- Saved phone numbers and addresses anchor matching.
-- SMS is used to enrich each contact with job/payment/follow-up evidence.
-- Unknown message numbers still appear in review, but the main customer list starts from trusted phone contacts.
-- Contacts with multiple phone numbers stay grouped as one CRM contact.
-
-## Install locally
+Requires Python 3.10 or newer.
 
 ```bash
 python3 -m venv .venv
@@ -49,14 +24,29 @@ python -m pip install --upgrade pip
 pip install -e .
 ```
 
+This installs the `sms-crm` command.
+
 ## Inputs
 
-Recommended:
+- `contacts.vcf` exported from Android Contacts, Google Contacts or iCloud. Optional, but matching is much better with it.
+- An `.xml` backup from the Android app **SMS Backup & Restore** (SyncTech). SMS is enough; MMS is optional, and only the text parts of an MMS are read.
 
-- `contacts.vcf` exported from Android Contacts / Google Contacts / iCloud Contacts.
-- `sms.xml` exported from Android app **SMS Backup & Restore** by SyncTech.
+### Export contacts from Android
 
-## Run sample
+1. Open the Contacts app.
+2. Go to **Fix & manage** or **Manage contacts**.
+3. Choose **Export to file** and save the `.vcf` locally.
+4. Move it to the computer over USB or another local transfer.
+
+### Export SMS from Android
+
+1. Install and open **SMS Backup & Restore**.
+2. Back up SMS (MMS optional) to local storage.
+3. Move the `.xml` file to the computer the same way.
+
+## Usage
+
+Try it on the bundled sample data first:
 
 ```bash
 sms-crm extract \
@@ -66,55 +56,79 @@ sms-crm extract \
   --yes
 ```
 
-## Run on real data
+Check that real exports parse, without writing anything:
+
+```bash
+sms-crm validate \
+  --contacts ~/sms-crm-extraction/input/contacts.vcf \
+  --sms ~/sms-crm-extraction/input/sms-YYYYMMDDHHMMSS.xml
+```
+
+Then extract:
 
 ```bash
 sms-crm extract \
   --contacts ~/sms-crm-extraction/input/contacts.vcf \
   --sms ~/sms-crm-extraction/input/sms-YYYYMMDDHHMMSS.xml \
-  --output ~/sms-crm-extraction/output \
-  --yes
+  --output ~/sms-crm-extraction/output
 ```
 
-Contacts are optional but strongly recommended:
+`--contacts` is optional. Without it, contacts are built from the SMS threads alone, using the names stored in the backup when present.
 
-```bash
-sms-crm extract --sms sms.xml --output output --yes
-```
+The command prints counts and the output folder, never message contents.
 
 ## Outputs
 
-- `contacts.csv` — CRM-ready contact/customer list.
-- `jobs.csv` — job/address/opportunity signals.
-- `payments.csv` — payment/quote/invoice clues with confidence and evidence snippets.
-- `review_needed.csv` — rows a human should inspect manually.
-- `messages.csv` — normalized message metadata and message text.
-- `crm.sqlite` — same data in SQLite.
-- `dashboard.html` — local browser review dashboard.
-- `audit_log.json` — counts, input hashes, and privacy flags.
+| File | Contents |
+| --- | --- |
+| `contacts.csv` | One row per contact, with phone numbers, saved addresses, message counts, a customer score, tags and a preview of the last message. |
+| `jobs.csv` | Job type, address and evidence snippets per contact. |
+| `payments.csv` | Payment clues: status guess, confidence, amount, method and the message snippet behind it. |
+| `review_needed.csv` | Items a person should check: payment signals, likely customers missing from contacts, and saved contacts with no texts. |
+| `messages.csv` | Every parsed message with its full text. |
+| `crm.sqlite` | The same five tables in SQLite. |
+| `dashboard.html` | A static page with the summary, top contacts and payment signals. |
+| `audit_log.json` | Counts, SHA-256 hashes of the input files and the privacy flags. |
 
-## Safety limits
+## How it decides
 
-Payment status is inferred from text and can be wrong. Treat it as a review queue, not accounting truth. For real payment verification, match against actual payment systems or accounting records.
-
-## Export contacts from Android
-
-Usually:
-
-1. Open Contacts app.
-2. Go to **Fix & manage** / **Manage contacts**.
-3. Choose **Export to file**.
-4. Save `.vcf` locally.
-5. Transfer `.vcf` to the laptop by USB/flash drive/local transfer.
-
-## Export SMS from Android
-
-1. Install/open **SMS Backup & Restore**.
-2. Set up a backup.
-3. Select SMS. MMS optional.
-4. Choose local backup.
-5. Transfer `.xml` to the laptop.
+- **Matching:** phone numbers are reduced to digits, and an 11-digit number starting with 1 drops the country code. Matching is tuned for US numbers. A contact with several numbers stays one CRM contact.
+- **Customer score:** points for being in contacts, a saved address, business keywords, addresses in messages, payment language and a two-way thread. Verification codes and promo texts lower the score. The result is `likely_customer`, `possible_customer` or `not_enough_evidence`.
+- **Payment status:** phrase matching produces guesses such as `paid_likely`, `invoice_sent`, `overdue_possible` or `quoted`, each with a confidence. Treat these as a review queue, not accounting truth. Confirm against real payment records before acting on them.
 
 ## Privacy
 
-Treat `.vcf`, `.xml`, CSVs, SQLite, and HTML as sensitive. Do not commit real exports or outputs to git. Do not upload them unless the data owner explicitly approves.
+- `messages.csv` and `crm.sqlite` hold the full text of every message in the backup, including personal ones. `contacts.csv`, `jobs.csv`, `payments.csv` and `dashboard.html` include message snippets.
+- Outputs are plain, unencrypted files. Write them to a folder only the data owner can read, and delete them when they're no longer needed.
+- `.gitignore` covers `input/`, `output/`, `*.xml`, `*.vcf` (except the test fixtures), `*.sqlite` and `*.db`. CSV, HTML and JSON outputs are only ignored inside `output/` or `input/`, so don't point `--output` at another folder in the repo.
+- Don't upload the exports or outputs anywhere unless the data owner explicitly approves.
+
+### Using it with an AI agent
+
+[`AGENT_README.md`](AGENT_README.md) is a prompt to paste into an agent that is helping someone run the tool. It tells the agent to stay local, avoid online converters and remote APIs, stop before anything that would send data over the network, and report counts and paths instead of message contents.
+
+## Development
+
+```text
+sms_crm_extractor/
+  cli.py       sms-crm extract / validate
+  vcf.py       vCard parser (FN, N, TEL, ADR, NOTE; quoted-printable)
+  sms_xml.py   SMS Backup & Restore XML parser (streaming)
+  crm.py       matching, scoring, job and payment signals
+  rules.py     keyword lists and patterns
+  output.py    CSV, SQLite, HTML and audit writers
+tests/         smoke tests and synthetic fixtures (555 numbers, example addresses)
+```
+
+The tests use pytest, which isn't a package dependency:
+
+```bash
+pip install pytest
+pytest
+```
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
+Maintained by Jonathan Bruce ([@whosebruce](https://github.com/whosebruce)).
