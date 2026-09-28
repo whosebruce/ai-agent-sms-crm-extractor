@@ -115,3 +115,4 @@ class CrmResult:
     payments: list[PaymentSignal]
     review: list[ReviewItem]
     summary: dict[str, Any]
+    client_intel: list[dict[str, str]] = field(default_factory=list)

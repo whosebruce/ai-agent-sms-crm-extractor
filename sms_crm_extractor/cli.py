@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 import sys
 
+from .client_intel import drop_into_checkout, resolve_checkout
 from .crm import build_crm
 from .output import write_outputs
 from .sms_xml import parse_sms_xml
@@ -16,6 +17,7 @@ Continue? [y/N] """
 
 
 def cmd_extract(args: argparse.Namespace) -> int:
+    client_intel_root = resolve_checkout(args.client_intel) if args.client_intel else None
     if not args.yes:
         answer = input(CONSENT).strip().lower()
         if answer not in {"y", "yes"}:
@@ -25,6 +27,7 @@ def cmd_extract(args: argparse.Namespace) -> int:
     messages = list(parse_sms_xml(args.sms))
     result = build_crm(contacts, messages, sms_path=args.sms, contacts_path=args.contacts)
     write_outputs(args.output, result)
+    dropped = drop_into_checkout(client_intel_root, result.client_intel) if client_intel_root else None
     print("SMS CRM extraction complete.")
     print(f"Messages parsed: {result.summary['messages_processed']}")
     print(f"Contacts seeded: {result.summary['contacts_seeded_from_vcf']}")
@@ -32,7 +35,11 @@ def cmd_extract(args: argparse.Namespace) -> int:
     print(f"Jobs detected: {result.summary['jobs_detected']}")
     print(f"Payment signals: {result.summary['payment_signals_detected']}")
     print(f"Review items: {result.summary['review_items']}")
+    print(f"Client Intel rows: {result.summary['client_intel_rows']} (client_intel.csv)")
     print(f"Output folder: {Path(args.output).resolve()}")
+    if dropped:
+        print(f"Client Intel drop: {dropped}")
+        print(f"Next: cd {dropped.parents[3]} && python3 scripts/ingest.py --json --geocode")
     return 0
 
 
@@ -54,6 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
     ex.add_argument("--contacts", help="optional contacts .vcf export")
     ex.add_argument("--sms", required=True, help="SMS Backup & Restore .xml file")
     ex.add_argument("--output", required=True, help="output folder")
+    ex.add_argument("--client-intel", metavar="CHECKOUT", help="path to a client-intel-dashboard checkout; also writes the customers into its data/raw/csv/ drop zone")
     ex.add_argument("--yes", action="store_true", help="accept local privacy warning non-interactively")
     ex.set_defaults(func=cmd_extract)
 

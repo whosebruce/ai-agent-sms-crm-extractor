@@ -2,14 +2,16 @@
 
 A local command-line tool that turns a phone's contacts export and an Android SMS backup into a small CRM: contacts, job leads, payment clues and a review queue.
 
-It's for small service businesses whose customer history lives in a phone. Saved contacts become the seed customer list, and SMS/MMS threads add job, address and payment evidence to each one. It is written so an AI agent can run it on the owner's computer without the messages leaving that machine. Version 0.1.0, first published June 2026.
+It's for small service businesses whose customer history lives in a phone. Saved contacts become the seed customer list, and SMS/MMS threads add job, address and payment evidence to each one. It is written so an AI agent can run it on the owner's computer without the messages leaving that machine.
+
+It pairs with [Client Intel Dashboard](https://github.com/whosebruce/client-intel-dashboard): the extractor finds the customers in a phone, and Client Intel puts them on a map with a follow-up queue. Version 0.2.0 (September 2026) adds that hand-off; 0.1.0 was published in June 2026.
 
 ## How it keeps data local
 
 - Pure Python standard library with no third-party dependencies.
 - No network code and no LLM calls. Extraction is keyword and pattern matching.
 - `extract` asks for confirmation before it reads anything. `--yes` skips the prompt for scripted runs.
-- `dashboard.html` is a single static file with no external scripts, fonts or images.
+- `dashboard.html` is a single static file with no scripts and no external requests. Its fonts are embedded.
 
 The outputs themselves are sensitive. See [Privacy](#privacy) below.
 
@@ -77,6 +79,34 @@ sms-crm extract \
 
 The command prints counts and the output folder, never message contents.
 
+## Send customers to Client Intel Dashboard
+
+[Client Intel Dashboard](https://github.com/whosebruce/client-intel-dashboard) is the companion app: a local map of customers with paid, due and lead status and a follow-up queue. Every run writes `client_intel.csv` in its import format, with one row per likely or possible customer. Contacts without enough customer evidence (friends, family, verification codes) are left out.
+
+| Client Intel column | Comes from |
+| --- | --- |
+| `name`, `phone` | the contact (first phone when there are several) |
+| `address`, `city` | the saved contact address, or else an address found in the texts |
+| `status` | the latest payment clue: paid likely → `paid`; invoice, balance or deposit → `unpaid` (shown as due); quote → `lead`; none → `lead` |
+| `value` | the latest amount mentioned with a payment clue |
+| `last_contact` | date of the last text |
+| `notes` | customer score, job type and payment clue as labels. No message text. |
+| `id`, `confidence` | stable contact id, and `sms likely` or `sms possible` |
+
+`lat`, `lng` and `follow_up` are left blank. To drop the file straight into a Client Intel checkout, add `--client-intel`:
+
+```bash
+sms-crm extract \
+  --contacts ~/sms-crm-extraction/input/contacts.vcf \
+  --sms ~/sms-crm-extraction/input/sms-YYYYMMDDHHMMSS.xml \
+  --output ~/sms-crm-extraction/output \
+  --client-intel ~/path/to/client-intel-dashboard
+```
+
+That writes `data/raw/csv/sms-crm-extractor.csv` in the checkout and prints the next command. The rows have addresses but no coordinates, so in Client Intel set `GOOGLE_MAPS_API_KEY` and run `python3 scripts/ingest.py --json --geocode`, or they stay off the map. You can also upload `client_intel.csv` with Client Intel's **Import** button.
+
+Payment status is still a guess from text. Client Intel shows it as a status, so check it against real payment records before chasing anyone.
+
 ## Outputs
 
 | File | Contents |
@@ -85,9 +115,10 @@ The command prints counts and the output folder, never message contents.
 | `jobs.csv` | Job type, address and evidence snippets per contact. |
 | `payments.csv` | Payment clues: status guess, confidence, amount, method and the message snippet behind it. |
 | `review_needed.csv` | Items a person should check: payment signals, likely customers missing from contacts, and saved contacts with no texts. |
+| `client_intel.csv` | Likely and possible customers in Client Intel Dashboard's import format. No message text. |
 | `messages.csv` | Every parsed message with its full text. |
 | `crm.sqlite` | The same five tables in SQLite. |
-| `dashboard.html` | A static page with the summary, top contacts and payment signals. |
+| `dashboard.html` | A static report styled like Client Intel: counts, the Client Intel next step, and tables of customers, payment clues, jobs and the review queue. About 120 KB because the fonts are embedded. |
 | `audit_log.json` | Counts, SHA-256 hashes of the input files and the privacy flags. |
 
 ## How it decides
@@ -98,7 +129,7 @@ The command prints counts and the output folder, never message contents.
 
 ## Privacy
 
-- `messages.csv` and `crm.sqlite` hold the full text of every message in the backup, including personal ones. `contacts.csv`, `jobs.csv`, `payments.csv` and `dashboard.html` include message snippets.
+- `messages.csv` and `crm.sqlite` hold the full text of every message in the backup, including personal ones. `contacts.csv`, `jobs.csv`, `payments.csv` and `dashboard.html` include message snippets. `client_intel.csv` has names, phones, addresses and amounts but no message text.
 - Outputs are plain, unencrypted files. Write them to a folder only the data owner can read, and delete them when they're no longer needed.
 - `.gitignore` covers `input/`, `output/`, `*.xml`, `*.vcf` (except the test fixtures), `*.sqlite` and `*.db`. CSV, HTML and JSON outputs are only ignored inside `output/` or `input/`, so don't point `--output` at another folder in the repo.
 - Don't upload the exports or outputs anywhere unless the data owner explicitly approves.
@@ -116,7 +147,10 @@ sms_crm_extractor/
   sms_xml.py   SMS Backup & Restore XML parser (streaming)
   crm.py       matching, scoring, job and payment signals
   rules.py     keyword lists and patterns
-  output.py    CSV, SQLite, HTML and audit writers
+  output.py    CSV, SQLite and audit writers
+  report.py    dashboard.html report
+  client_intel.py  client_intel.csv and --client-intel hand-off
+  assets/fonts/    OFL fonts embedded in the report
 tests/         smoke tests and synthetic fixtures (555 numbers, example addresses)
 ```
 
