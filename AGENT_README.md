@@ -109,6 +109,16 @@ Windows PowerShell:
 start $HOME\sms-crm-extraction\output\dashboard.html
 ```
 
+## 5) Hand off to Client Intel Dashboard (optional)
+
+If the user also runs [Client Intel Dashboard](https://github.com/whosebruce/client-intel-dashboard), every extraction already wrote `client_intel.csv` (likely and possible customers, no message text). To drop it into their checkout, rerun extract with `--client-intel <path to client-intel-dashboard>`, then in that checkout:
+
+```bash
+python3 scripts/ingest.py --json --geocode   # needs GOOGLE_MAPS_API_KEY in the local shell
+```
+
+Without a geocoding key the rows import but stay off the map (they have addresses, not coordinates). Don't also copy the SMS `.xml` into Client Intel's `data/raw/sms/`, or the texts are imported twice.
+
 ## Final response format
 
 Report only counts and paths unless the user asks for private details:
@@ -124,6 +134,7 @@ CRM contacts: [number]
 Jobs detected: [number]
 Payment signals: [number]
 Review items: [number]
+Client Intel rows: [number] ([path to client_intel.csv or the checkout drop])
 Privacy: no cloud upload, no external API/LLM used.
 Important: payment status is inferred from text and requires human review.
 ```

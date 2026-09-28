@@ -4,6 +4,7 @@ from collections import defaultdict
 from pathlib import Path
 import hashlib
 
+from .client_intel import client_intel_rows
 from .models import ContactSeed, CrmContact, CrmResult, JobSignal, Message, PaymentSignal, ReviewItem
 from .phone import display_phone, stable_id
 from .rules import CUSTOMER_KEYWORDS, SPAM_KEYWORDS, classify_job, detect_addresses, detect_amount, detect_payment_method, payment_status, text_contains_any
@@ -202,6 +203,7 @@ def build_crm(seeds: list[ContactSeed], messages: list[Message], sms_path: str |
         if any(p.contact_id == contact_id for p in payments):
             review.append(ReviewItem(stable_id("review", contact_id, "payment"), contact_id, primary_phone, name, "payment_signal_needs_human_review", "Confirm against real payment records before marking paid/unpaid.", conf, last_preview, thread[-1].message_id if thread else ""))
 
+    client_intel, not_customers = client_intel_rows(contacts_out, jobs, payments, seeds)
     summary = {
         "messages_processed": len(messages),
         "contacts_seeded_from_vcf": len(seeds),
@@ -210,10 +212,12 @@ def build_crm(seeds: list[ContactSeed], messages: list[Message], sms_path: str |
         "jobs_detected": len(jobs),
         "payment_signals_detected": len(payments),
         "review_items": len(review),
+        "client_intel_rows": len(client_intel),
+        "client_intel_skipped_not_enough_evidence": not_customers,
         "sms_xml_sha256": file_sha256(sms_path) if sms_path else "",
         "contacts_vcf_sha256": file_sha256(contacts_path) if contacts_path else "",
         "network_used": False,
         "llm_used": False,
         "privacy_note": "Local rule-based extraction only. Contacts with multiple phone numbers are one CRM contact. Payment status is inferred and requires human review.",
     }
-    return CrmResult(sorted(contacts_out, key=lambda c: (c.customer_confidence, c.message_count), reverse=True), messages, jobs, payments, review, summary)
+    return CrmResult(sorted(contacts_out, key=lambda c: (c.customer_confidence, c.message_count), reverse=True), messages, jobs, payments, review, summary, client_intel)
